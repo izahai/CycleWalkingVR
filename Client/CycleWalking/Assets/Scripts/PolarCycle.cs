@@ -22,12 +22,22 @@ public class UdpCyclingLocomotion : MonoBehaviour
     public float maxSpeed = 10.0f;
     public float acceleration = 5.0f;  // units/sec^2
 
+    [Header("Slope Detection")]
+    public float slopeRayLength = 1.2f;
+    public LayerMask groundMask = ~0; // default: everything
+    public float slopeAnimScale = 1.5f;
+
+    [Header("Visual Root")]
+    public Transform avatarRoot;
+
     [Header("Animation")]
     public Animator animator;
-    public string speedParam = "WalkSpeed";
+    private string speedParam = "Speed";
+    private string slopeParam = "Slope";
+
 
     [Header("Debug")]
-    public bool logSpeed;
+    public bool logSpeed = true;
     public float logInterval = 0.5f;
 
     // --- Networking ---
@@ -41,6 +51,11 @@ public class UdpCyclingLocomotion : MonoBehaviour
     // --- Motion ---
     float filteredSpeed;
     float nextLogTime;
+    float slopeState;   // 0 = flat, 1 = uphill
+    float slopeVelocity;
+    float visualYOffset;
+    float visualYVelocity;
+    float lastCapsuleY;
 
     // --- Angle tracking ---
     float lastAngle;
@@ -49,6 +64,12 @@ public class UdpCyclingLocomotion : MonoBehaviour
 
     // --- Animation ---
     CharacterController controller;
+
+    // --- Exposed Var ---
+    public float CurrentSpeed => filteredSpeed;
+    public bool IsGrounded => controller.isGrounded;
+    public bool IsMoving => filteredSpeed > 0.1f;
+
 
 
     void Start()
@@ -59,6 +80,7 @@ public class UdpCyclingLocomotion : MonoBehaviour
         recvThread.Start();
 
         controller = GetComponent<CharacterController>();
+        lastCapsuleY = transform.position.y;
     }
 
     void ReceiveLoop()
@@ -135,27 +157,64 @@ public class UdpCyclingLocomotion : MonoBehaviour
             acceleration * Time.fixedDeltaTime
         );
 
-        if (logSpeed && Time.time >= nextLogTime)
-        {
-            Debug.Log($"Humanoid speed: {filteredSpeed:F3} units/sec");
-            nextLogTime = Time.time + logInterval;
-        }
-
         // --- Move avatar ---
         Vector3 move = transform.forward * filteredSpeed * Time.fixedDeltaTime;
         controller.Move(move);
 
-        // --- Drive animation ---
+        // --- Drive walking animation ---
         if (animator != null)
             animator.SetFloat(
                 speedParam,
-                filteredSpeed,
-                0.1f,                // damping time
-                Time.fixedDeltaTime
+                filteredSpeed
+                // 0.1f,                // damping time
+                // Time.fixedDeltaTime
             );
 
+        // --- Drive walking up animation ---
+        float slope = ComputeSlope();
+        animator.SetFloat(
+            slopeParam,
+            slope,
+            0.1f,
+            Time.fixedDeltaTime
+        );
 
+        if (logSpeed && Time.time >= nextLogTime)
+        {
+            Debug.Log($"Humanoid speed: {filteredSpeed:F3} units/sec");
+            //Debug.Log($"Humanoid slope: {slope:F3}");
+            nextLogTime = Time.time + logInterval;
+        }
     }
+
+    void LateUpdate()
+    {
+        if (avatarRoot == null) return;
+
+        // How much the capsule moved vertically this frame
+        float capsuleY = transform.position.y;
+        float deltaY = capsuleY - lastCapsuleY;
+        lastCapsuleY = capsuleY;
+
+        // Accumulate visual offset
+        float targetOffset = visualYOffset + deltaY;
+
+        // Smooth it
+        visualYOffset = Mathf.SmoothDamp(
+            visualYOffset,
+            targetOffset,
+            ref visualYVelocity,
+            0.15f   // 0.1–0.25 works well for stairs
+        );
+
+        // Apply ONLY to visual mesh
+        avatarRoot.localPosition = new Vector3(
+            avatarRoot.localPosition.x,
+            visualYOffset,
+            avatarRoot.localPosition.z
+        );
+    }
+
 
     void OnDestroy()
     {
@@ -166,5 +225,40 @@ public class UdpCyclingLocomotion : MonoBehaviour
         catch { }
 
         client?.Close();
+    }
+
+    float ComputeSlope()
+    {
+        bool isGrounded = controller.isGrounded;
+        bool isMovingForward = filteredSpeed > 0.1f;
+
+        float target = 0f;
+
+        if (isGrounded && isMovingForward)
+        {
+            // 1) Normal-based slope
+            float normalSlope = 0f;
+            Ray ray = new Ray(transform.position + Vector3.up * 0.2f, Vector3.down);
+            if (Physics.Raycast(ray, out RaycastHit hit, slopeRayLength, groundMask))
+            {
+                float angle = Vector3.Angle(hit.normal, Vector3.up);
+                normalSlope = Mathf.InverseLerp(5f, 35f, angle);
+            }
+
+            // 2) Step-based vertical intent (not raw velocity)
+            float verticalIntent = controller.velocity.y > 0.05f ? 1f : 0f;
+
+            target = Mathf.Max(normalSlope, verticalIntent);
+        }
+
+        // 3) Smooth with critically damped motion
+        slopeState = Mathf.SmoothDamp(
+            slopeState,
+            target,
+            ref slopeVelocity,
+            0.5f   // smoothing time (tune this)
+        );
+
+        return slopeState * slopeAnimScale;
     }
 }
