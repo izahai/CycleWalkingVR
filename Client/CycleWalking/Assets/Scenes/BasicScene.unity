@@ -344,8 +344,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UdpCyclingLocomotion
   listenPort: 9000
-  speedScale: 0.004
-  animationScale: 0.4
+  speedScale: 0.0025
   maxSpeed: 1000
   acceleration: 5
   animator: {fileID: 1688983758}

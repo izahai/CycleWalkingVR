@@ -19,7 +19,6 @@ public class UdpCyclingLocomotion : MonoBehaviour
 
     [Header("Locomotion")]
     public float speedScale = 0.01f;   // deg/sec → units/sec
-    public float animationScale = 0.01f;   // deg/sec → units/sec
     public float maxSpeed = 10.0f;
     public float acceleration = 5.0f;  // units/sec^2
 
@@ -48,12 +47,18 @@ public class UdpCyclingLocomotion : MonoBehaviour
     float lastTime;
     bool hasLastSample;
 
+    // --- Animation ---
+    CharacterController controller;
+
+
     void Start()
     {
         client = new UdpClient(listenPort);
         recvThread = new Thread(ReceiveLoop);
         recvThread.IsBackground = true;
         recvThread.Start();
+
+        controller = GetComponent<CharacterController>();
     }
 
     void ReceiveLoop()
@@ -137,12 +142,19 @@ public class UdpCyclingLocomotion : MonoBehaviour
         }
 
         // --- Move avatar ---
-        transform.position -=
-            Vector3.forward * filteredSpeed * Time.fixedDeltaTime;
+        Vector3 move = transform.forward * filteredSpeed * Time.fixedDeltaTime;
+        controller.Move(move);
 
         // --- Drive animation ---
         if (animator != null)
-            animator.SetFloat(speedParam, filteredSpeed*animationScale);
+            animator.SetFloat(
+                speedParam,
+                filteredSpeed,
+                0.1f,                // damping time
+                Time.fixedDeltaTime
+            );
+
+
     }
 
     void OnDestroy()
