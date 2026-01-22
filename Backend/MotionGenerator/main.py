@@ -2,14 +2,15 @@ import socket
 import json
 import time
 import math
+import sys
 
 import pygame
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
 # ================= UDP CONFIG =================
-UDP_IP = "127.0.0.1"
-UDP_PORT = 9000
+UDP_IP = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
+UDP_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 9000
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # ================= PYGAME + OPENGL =================
@@ -21,6 +22,79 @@ screen = pygame.display.set_mode(
 )
 clock = pygame.time.Clock()
 
+
+def update_caption(speed_value):
+    pygame.display.set_caption(
+        f"Motion Generator - 3D View | speed: {speed_value:.2f}x"
+    )
+
+
+def get_speed_slider_rect(window_size):
+    margin = 20
+    width = 220
+    height = 12
+    x = margin
+    y = window_size[1] - margin - height
+    return x, y, width, height
+
+
+def speed_from_slider(x, slider_rect, min_speed, max_speed):
+    sx, _, sw, _ = slider_rect
+    t = clamp((x - sx) / max(sw, 1), 0.0, 1.0)
+    return min_speed + t * (max_speed - min_speed)
+
+
+def draw_speed_slider(window_size, speed_value, min_speed, max_speed):
+    sx, sy, sw, sh = get_speed_slider_rect(window_size)
+    t = clamp((speed_value - min_speed) / max(max_speed - min_speed, 0.001), 0.0, 1.0)
+    handle_x = sx + t * sw
+
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    glOrtho(0, window_size[0], window_size[1], 0, -1, 1)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    glDisable(GL_LIGHTING)
+    glDisable(GL_DEPTH_TEST)
+
+    # Bar background
+    glColor3f(0.1, 0.1, 0.12)
+    glBegin(GL_QUADS)
+    glVertex2f(sx, sy)
+    glVertex2f(sx + sw, sy)
+    glVertex2f(sx + sw, sy + sh)
+    glVertex2f(sx, sy + sh)
+    glEnd()
+
+    # Filled portion
+    glColor3f(0.2, 0.7, 1.0)
+    glBegin(GL_QUADS)
+    glVertex2f(sx, sy)
+    glVertex2f(handle_x, sy)
+    glVertex2f(handle_x, sy + sh)
+    glVertex2f(sx, sy + sh)
+    glEnd()
+
+    # Handle
+    handle_w = 8
+    glColor3f(0.9, 0.9, 0.9)
+    glBegin(GL_QUADS)
+    glVertex2f(handle_x - handle_w, sy - 4)
+    glVertex2f(handle_x + handle_w, sy - 4)
+    glVertex2f(handle_x + handle_w, sy + sh + 4)
+    glVertex2f(handle_x - handle_w, sy + sh + 4)
+    glEnd()
+
+    glEnable(GL_DEPTH_TEST)
+    glEnable(GL_LIGHTING)
+
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
 
 def setup_gl(width, height):
     glViewport(0, 0, width, height)
@@ -169,7 +243,15 @@ def generate_leg_pose(t, phase, x_offset):
 setup_gl(*screen_size)
 quadric = gluNewQuadric()
 
+# Tunables
+motion_speed = 10.0  # higher = faster leg cycle
+invert_camera_rotation = False  # set True to invert mouse rotate
+min_motion_speed = 0.2
+max_motion_speed = 12.0
+
 print("3D controls: left-drag rotate, right-drag pan, wheel zoom, R reset.")
+print("Speed: drag slider or use +/- to change motion speed.")
+update_caption(motion_speed)
 
 # ================= MAIN LOOP =================
 start_time = time.time()
@@ -183,9 +265,10 @@ cam_distance = 3.0
 mouse_rotate = False
 mouse_pan = False
 last_mouse_pos = None
+dragging_speed = False
 
 while running:
-    t = (time.time() - start_time) * 2.0  # speed factor
+    t = (time.time() - start_time) * motion_speed
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -204,9 +287,29 @@ while running:
                 cam_yaw = 45.0
                 cam_pitch = 20.0
                 cam_distance = 3.0
+            elif event.key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS):
+                motion_speed = clamp(
+                    motion_speed + 0.2, min_motion_speed, max_motion_speed
+                )
+                update_caption(motion_speed)
+            elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+                motion_speed = clamp(
+                    motion_speed - 0.2, min_motion_speed, max_motion_speed
+                )
+                update_caption(motion_speed)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
-                mouse_rotate = True
+                slider_rect = get_speed_slider_rect(screen_size)
+                sx, sy, sw, sh = slider_rect
+                mx, my = event.pos
+                if sx - 10 <= mx <= sx + sw + 10 and sy - 10 <= my <= sy + sh + 10:
+                    dragging_speed = True
+                    motion_speed = speed_from_slider(
+                        mx, slider_rect, min_motion_speed, max_motion_speed
+                    )
+                    update_caption(motion_speed)
+                else:
+                    mouse_rotate = True
                 last_mouse_pos = event.pos
             elif event.button == 3:
                 mouse_pan = True
@@ -217,6 +320,8 @@ while running:
                 cam_distance = clamp(cam_distance * 1.1, 0.8, 12.0)
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
+                if dragging_speed:
+                    dragging_speed = False
                 mouse_rotate = False
             elif event.button == 3:
                 mouse_pan = False
@@ -233,9 +338,16 @@ while running:
             dy = event.pos[1] - last_mouse_pos[1]
             last_mouse_pos = event.pos
 
-            if mouse_rotate:
-                cam_yaw += dx * 0.3
-                cam_pitch -= dy * 0.3
+            if dragging_speed:
+                slider_rect = get_speed_slider_rect(screen_size)
+                motion_speed = speed_from_slider(
+                    event.pos[0], slider_rect, min_motion_speed, max_motion_speed
+                )
+                update_caption(motion_speed)
+            elif mouse_rotate:
+                rotate_dir = -1.0 if invert_camera_rotation else 1.0
+                cam_yaw += dx * 0.3 * rotate_dir
+                cam_pitch -= dy * 0.3 * rotate_dir
                 cam_pitch = clamp(cam_pitch, -89.0, 89.0)
             elif mouse_pan:
                 _, right, up, _ = camera_vectors(cam_yaw, cam_pitch)
@@ -255,6 +367,7 @@ while running:
 
     draw_sphere(quadric, lpos, 0.06, (0.1, 0.7, 1.0))
     draw_sphere(quadric, rpos, 0.06, (1.0, 0.4, 0.3))
+    draw_speed_slider(screen_size, motion_speed, min_motion_speed, max_motion_speed)
 
     # UDP send
     for leg_id, pos, rot in [
