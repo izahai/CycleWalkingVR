@@ -27,9 +27,6 @@ public class UdpCyclingLocomotion : MonoBehaviour
     public LayerMask groundMask = ~0; // default: everything
     public float slopeAnimScale = 1.5f;
 
-    [Header("Visual Root")]
-    public Transform avatarRoot;
-
     [Header("Animation")]
     public Animator animator;
     private string speedParam = "Speed";
@@ -53,9 +50,6 @@ public class UdpCyclingLocomotion : MonoBehaviour
     float nextLogTime;
     float slopeState;   // 0 = flat, 1 = uphill
     float slopeVelocity;
-    float visualYOffset;
-    float visualYVelocity;
-    float lastCapsuleY;
 
     // --- Angle tracking ---
     float lastAngle;
@@ -80,7 +74,7 @@ public class UdpCyclingLocomotion : MonoBehaviour
         recvThread.Start();
 
         controller = GetComponent<CharacterController>();
-        lastCapsuleY = transform.position.y;
+
     }
 
     void ReceiveLoop()
@@ -165,9 +159,9 @@ public class UdpCyclingLocomotion : MonoBehaviour
         if (animator != null)
             animator.SetFloat(
                 speedParam,
-                filteredSpeed
-                // 0.1f,                // damping time
-                // Time.fixedDeltaTime
+                filteredSpeed,
+                0.1f,                // damping time
+                Time.fixedDeltaTime
             );
 
         // --- Drive walking up animation ---
@@ -181,40 +175,11 @@ public class UdpCyclingLocomotion : MonoBehaviour
 
         if (logSpeed && Time.time >= nextLogTime)
         {
-            Debug.Log($"Humanoid speed: {filteredSpeed:F3} units/sec");
+            //Debug.Log($"Humanoid speed: {filteredSpeed:F3} units/sec");
             //Debug.Log($"Humanoid slope: {slope:F3}");
             nextLogTime = Time.time + logInterval;
         }
     }
-
-    void LateUpdate()
-    {
-        if (avatarRoot == null) return;
-
-        // How much the capsule moved vertically this frame
-        float capsuleY = transform.position.y;
-        float deltaY = capsuleY - lastCapsuleY;
-        lastCapsuleY = capsuleY;
-
-        // Accumulate visual offset
-        float targetOffset = visualYOffset + deltaY;
-
-        // Smooth it
-        visualYOffset = Mathf.SmoothDamp(
-            visualYOffset,
-            targetOffset,
-            ref visualYVelocity,
-            0.15f   // 0.1–0.25 works well for stairs
-        );
-
-        // Apply ONLY to visual mesh
-        avatarRoot.localPosition = new Vector3(
-            avatarRoot.localPosition.x,
-            visualYOffset,
-            avatarRoot.localPosition.z
-        );
-    }
-
 
     void OnDestroy()
     {

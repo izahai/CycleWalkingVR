@@ -1,17 +1,14 @@
-import socket
 import json
 import time
 import math
-import sys
 
 import pygame
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
-# ================= UDP CONFIG =================
-UDP_IP = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
-UDP_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 9000
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# ================= RECORDING CONFIG =================
+RECORD_DURATION_SEC = 20.0
+RECORD_OUTPUT_PATH = "sphere_positions.json"
 
 # ================= PYGAME + OPENGL =================
 pygame.init()
@@ -256,6 +253,8 @@ update_caption(motion_speed)
 # ================= MAIN LOOP =================
 start_time = time.time()
 running = True
+positions = []
+positions_saved = False
 
 cam_target = [0.0, 0.9, 0.0]
 cam_yaw = 45.0
@@ -362,27 +361,34 @@ while running:
     draw_3d_grid()
     draw_axes()
 
-    lpos, lrot = generate_leg_pose(t, 0.0, -0.18)
-    rpos, rrot = generate_leg_pose(t, math.pi, 0.18)
+    pos, rot = generate_leg_pose(t, 0.0, 0.0)
 
-    draw_sphere(quadric, lpos, 0.06, (0.1, 0.7, 1.0))
-    draw_sphere(quadric, rpos, 0.06, (1.0, 0.4, 0.3))
+    draw_sphere(quadric, pos, 0.06, (0.2, 0.7, 1.0))
+    
     draw_speed_slider(screen_size, motion_speed, min_motion_speed, max_motion_speed)
 
-    # UDP send
-    for leg_id, pos, rot in [
-        ("left_leg", lpos, lrot),
-        ("right_leg", rpos, rrot),
-    ]:
-        packet = json.dumps(
-            {
-                "id": leg_id,
-                "pos": pos,
-                "rot": rot,
-                "ts": time.time(),
-            }
-        ).encode("utf-8")
-        sock.sendto(packet, (UDP_IP, UDP_PORT))
+    # Record sphere position for the first RECORD_DURATION_SEC seconds.
+    now = time.time()
+    if not positions_saved:
+        if now - start_time <= RECORD_DURATION_SEC:
+            positions.append(
+                {
+                    "pos": [pos[0], pos[1], pos[2]],
+                }
+            )
+        else:
+            with open(RECORD_OUTPUT_PATH, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "duration_sec": RECORD_DURATION_SEC,
+                        "count": len(positions),
+                        "samples": positions,
+                    },
+                    f,
+                    indent=2,
+                )
+            positions_saved = True
+
 
     pygame.display.flip()
     clock.tick(60)
