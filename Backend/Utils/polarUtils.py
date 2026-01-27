@@ -3,6 +3,7 @@ import math
 import random
 
 import pygame
+import numpy as np
 
 
 def load_positions(path):
@@ -94,6 +95,29 @@ def centroid(points):
         sz += z
     n = float(len(centers))
     return [sx / n, sy / n, sz / n]
+
+
+def best_fit_3d_circle(points):
+    if not points:
+        return None
+
+    pts = np.asarray(points, dtype=float)
+    if pts.ndim != 2 or pts.shape[1] < 3:
+        return None
+
+    center = np.asarray(centroid(points), dtype=float)
+    centered = pts - center
+    cov = centered.T @ centered
+    _, _, vh = np.linalg.svd(cov)
+    normal = vh[-1]
+    norm = np.linalg.norm(normal)
+    if norm < 1e-12:
+        return None
+    normal = normal / norm
+    deltas = pts - center
+    radii = np.linalg.norm(deltas, axis=1)
+    radius = float(np.mean(radii)) if radii.size else 0.0
+    return center.tolist(), normal.tolist(), radius
 
 
 def line_origin_to_highest_y(points, origin):

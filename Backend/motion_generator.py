@@ -7,8 +7,14 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 
 # ================= RECORDING CONFIG =================
-RECORD_DURATION_SEC = 20.0
-RECORD_OUTPUT_PATH = "sphere_positions.json"
+RECORD_DURATION_SEC = 10.0
+RECORD_OUTPUT_PATH = "sphere_positions_horizontal.json"
+
+# ================= ORBIT CONFIG =================
+# Control the motion here.
+ORBIT_ORIGIN = [1.0, 1.0, 1.0]
+ORBIT_NORMAL = [0.0, 1.0, 0.0]
+ORBIT_RADIUS = 0.5
 
 # ================= PYGAME + OPENGL =================
 pygame.init()
@@ -219,14 +225,26 @@ def draw_sphere(quadric, pos, radius, color):
 
 
 # ================= MOTION =================
-def generate_leg_pose(t, phase, x_offset):
+def generate_orbit_pose(t, origin, normal, radius):
+    angle = t
+    n = normalize(normal)
+    if abs(n[0]) < 0.9:
+        ref = [1.0, 0.0, 0.0]
+    else:
+        ref = [0.0, 0.0, 1.0]
+    basis_u = normalize(cross(n, ref))
+    basis_v = cross(n, basis_u)
+    offset = [
+        radius * math.cos(angle) * basis_u[0] + radius * math.sin(angle) * basis_v[0],
+        radius * math.cos(angle) * basis_u[1] + radius * math.sin(angle) * basis_v[1],
+        radius * math.cos(angle) * basis_u[2] + radius * math.sin(angle) * basis_v[2],
+    ]
     pos_world = [
-        x_offset,  # <-- fixed X position
-        0.9 + 0.15 * math.sin(t + phase),
-        0.15 * math.cos(t + phase),
+        origin[0] + offset[0],
+        origin[1] + offset[1],
+        origin[2] + offset[2],
     ]
 
-    angle = t + phase
     rot_world = [
         math.sin(angle / 2.0),
         0.0,
@@ -256,7 +274,11 @@ running = True
 positions = []
 positions_saved = False
 
-cam_target = [0.0, 0.9, 0.0]
+orbit_origin = ORBIT_ORIGIN[:]
+orbit_normal = ORBIT_NORMAL[:]
+orbit_radius = ORBIT_RADIUS
+
+cam_target = orbit_origin[:]
 cam_yaw = 45.0
 cam_pitch = 20.0
 cam_distance = 3.0
@@ -282,7 +304,7 @@ while running:
             if event.key == pygame.K_ESCAPE:
                 running = False
             elif event.key == pygame.K_r:
-                cam_target = [0.0, 0.9, 0.0]
+                cam_target = orbit_origin[:]
                 cam_yaw = 45.0
                 cam_pitch = 20.0
                 cam_distance = 3.0
@@ -361,8 +383,10 @@ while running:
     draw_3d_grid()
     draw_axes()
 
-    pos, rot = generate_leg_pose(t, 0.0, 0.0)
+    pos, rot = generate_orbit_pose(t, orbit_origin, orbit_normal, orbit_radius)
 
+    # Draw orbit center
+    draw_sphere(quadric, orbit_origin, 0.04, (1.0, 0.4, 0.2))
     draw_sphere(quadric, pos, 0.06, (0.2, 0.7, 1.0))
     
     draw_speed_slider(screen_size, motion_speed, min_motion_speed, max_motion_speed)

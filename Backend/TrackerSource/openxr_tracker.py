@@ -15,7 +15,6 @@ class OpenVRTrackerSource(TrackerSource):
             0,
             openvr.k_unMaxTrackedDeviceCount
         )
-
         for i in range(openvr.k_unMaxTrackedDeviceCount):
             if (
                 self.vr.isTrackedDeviceConnected(i)

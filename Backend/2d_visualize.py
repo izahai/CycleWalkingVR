@@ -1,12 +1,13 @@
 import sys
 
-from polarUtils import (
+from Utils.polarUtils import (
     load_positions, choose_random_points,
     centroid, visualize_points
 )
 
-DEFAULT_PATH = "sphere_positions.json"
+DEFAULT_PATH = "sphere_positions_horizontal.json"
 DEFAULT_SAMPLE_COUNT = 100
+SHOW = True
 
 
 def main():
@@ -14,7 +15,6 @@ def main():
     sample_count = DEFAULT_SAMPLE_COUNT
     if len(sys.argv) > 2:
         sample_count = max(1, int(sys.argv[2]))
-    show = "--show" in sys.argv[1:]
 
     positions = load_positions(path)
     if not positions:
@@ -27,7 +27,7 @@ def main():
 
     print(f"Samples used: {len(samples)} / {len(positions)}")
     print(f"Centroid: x={center[0]:.6f}, y={center[1]:.6f}, z={center[2]:.6f}")
-    if show:
+    if SHOW:
         visualize_points(samples, center)
 
 
