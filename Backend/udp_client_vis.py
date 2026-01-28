@@ -15,6 +15,8 @@ WINDOW_W = 900
 WINDOW_H = 700
 BG_COLOR = (15, 18, 22)
 AXIS_COLOR = (80, 90, 110)
+GRID_MINOR_COLOR = (35, 45, 60)
+GRID_MAJOR_COLOR = (55, 70, 90)
 POINT_OLDEST_COLOR = (80, 120, 170)
 POINT_NEWEST_COLOR = (180, 240, 255)
 TEXT_COLOR = (230, 230, 230)
@@ -25,6 +27,9 @@ Z_CLIP = -2.5
 ROTATE_SPEED = 0.008
 MAX_POINTS = 10
 CIRCLE_SEGMENTS = 64
+GRID_SIZE = 2.0
+GRID_STEP = 0.25
+GRID_MAJOR_STEP = 1.0
 
 positions = []
 latest_ts = 0.0
@@ -147,6 +152,32 @@ def draw_axes(screen, cx, cy, yaw, pitch):
         pygame.draw.line(screen, AXIS_COLOR, (cx, cy), (sx, sy), 2)
 
 
+def draw_grid(screen, cx, cy, yaw, pitch):
+    def draw_line(p0, p1, color, width=1):
+        rx0, ry0, rz0 = rotate_point(p0[0], p0[1], p0[2], yaw, pitch)
+        rx1, ry1, rz1 = rotate_point(p1[0], p1[1], p1[2], yaw, pitch)
+        sx0, sy0, _ = project_point(rx0, ry0, rz0, cx, cy)
+        sx1, sy1, _ = project_point(rx1, ry1, rz1, cx, cy)
+        pygame.draw.line(screen, color, (sx0, sy0), (sx1, sy1), width)
+
+    steps = int((GRID_SIZE * 2) / GRID_STEP)
+    for i in range(steps + 1):
+        offset = -GRID_SIZE + i * GRID_STEP
+        is_major = abs((offset / GRID_MAJOR_STEP) - round(offset / GRID_MAJOR_STEP)) < 1e-6
+        color = GRID_MAJOR_COLOR if is_major else GRID_MINOR_COLOR
+        width = 2 if is_major else 1
+
+        # XZ plane (y=0).
+        draw_line((-GRID_SIZE, 0.0, offset), (GRID_SIZE, 0.0, offset), color, width)
+        draw_line((offset, 0.0, -GRID_SIZE), (offset, 0.0, GRID_SIZE), color, width)
+        # XY plane (z=0).
+        draw_line((-GRID_SIZE, offset, 0.0), (GRID_SIZE, offset, 0.0), color, width)
+        draw_line((offset, -GRID_SIZE, 0.0), (offset, GRID_SIZE, 0.0), color, width)
+        # YZ plane (x=0).
+        draw_line((0.0, -GRID_SIZE, offset), (0.0, GRID_SIZE, offset), color, width)
+        draw_line((0.0, offset, -GRID_SIZE), (0.0, offset, GRID_SIZE), color, width)
+
+
 def _normalize(vec):
     length = math.sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2])
     if length < 1e-12:
@@ -233,6 +264,7 @@ def main():
 
         screen.fill(BG_COLOR)
         cx, cy = WINDOW_W // 2, WINDOW_H // 2
+        draw_grid(screen, cx, cy, yaw, pitch)
         draw_axes(screen, cx, cy, yaw, pitch)
 
         with lock:
