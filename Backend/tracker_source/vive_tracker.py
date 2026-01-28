@@ -1,4 +1,4 @@
-from TrackerSource.abc_tracker import TrackerSource
+from tracker_source.abc_tracker import TrackerSource
 
 class ViveTrackers:
     def __init__(self, source: TrackerSource):

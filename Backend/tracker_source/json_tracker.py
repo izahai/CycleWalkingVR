@@ -1,5 +1,5 @@
 import json
-from TrackerSource.abc_tracker import TrackerSource
+from tracker_source.abc_tracker import TrackerSource
 
 class JsonTrackerSource(TrackerSource):
     def __init__(self, path, loop=True):

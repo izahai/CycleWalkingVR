@@ -1,7 +1,8 @@
 import time
-from Broadcaster.udp_broadcast import TrackerUdpBroadcaster
-from TrackerSource.json_tracker import JsonTrackerSource
-from TrackerSource.vive_tracker import ViveTrackers
+from models.broadcaster import TrackerUdpBroadcaster
+from models.tracker_runner import TrackerRunner
+from tracker_source.json_tracker import JsonTrackerSource
+from tracker_source.vive_tracker import ViveTrackers
 
 LAN_IP = "255.255.255.255"
 LOCALHOST_IP = "127.0.0.1"
