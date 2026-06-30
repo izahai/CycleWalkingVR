@@ -14,7 +14,11 @@ SOCKET_TIMEOUT_S = 0.1
 WINDOW_W = 900
 WINDOW_H = 700
 BG_COLOR = (15, 18, 22)
-AXIS_COLOR = (80, 90, 110)
+AXIS_X_COLOR = (220, 90, 90)
+AXIS_Y_COLOR = (90, 220, 130)
+AXIS_Z_COLOR = (90, 140, 220)
+GRID_MINOR_COLOR = (35, 45, 60)
+GRID_MAJOR_COLOR = (55, 70, 90)
 POINT_OLDEST_COLOR = (80, 120, 170)
 POINT_NEWEST_COLOR = (180, 240, 255)
 TEXT_COLOR = (230, 230, 230)
@@ -25,11 +29,15 @@ Z_CLIP = -2.5
 ROTATE_SPEED = 0.008
 MAX_POINTS = 10
 CIRCLE_SEGMENTS = 64
+CIRCLE_HISTORY = 50
+GRID_SIZE = 2.0
+GRID_STEP = 0.5
+GRID_MAJOR_STEP = 1.0
 
 positions = []
 latest_ts = 0.0
-circle_data = None
-yline_data = None
+circle_data = []
+yline_data = []
 degree_data = None
 lock = threading.Lock()
 
@@ -73,26 +81,32 @@ def recv_loop():
             if len(center) < 3 or len(normal) < 3:
                 continue
             with lock:
-                circle_data = (
-                    (float(center[0]), float(center[1]), float(center[2])),
-                    (float(normal[0]), float(normal[1]), float(normal[2])),
-                    float(radius),
+                circle_data.append(
+                    (
+                        (float(center[0]), float(center[1]), float(center[2])),
+                        (float(normal[0]), float(normal[1]), float(normal[2])),
+                        float(radius),
+                    )
                 )
+                if len(circle_data) > CIRCLE_HISTORY:
+                    del circle_data[: len(circle_data) - CIRCLE_HISTORY]
             print(
                 f"recv circle: r={float(radius):.6f} age={age:.2f}s"
             )
             continue
         if msg_type == "refline":
-            if not all(k in msg for k in ("origin", "highest")):
+            if not all(k in msg for k in ("origin", "point")):
                 continue
             origin = msg["origin"]
-            highest = msg["highest"]
-            if len(origin) < 3 or len(highest) < 3:
+            point = msg["point"]
+            if len(origin) < 3 or len(point) < 3:
                 continue
             with lock:
-                yline_data = (
-                    (float(origin[0]), float(origin[1]), float(origin[2])),
-                    (float(highest[0]), float(highest[1]), float(highest[2])),
+                yline_data.append(
+                    (
+                        (float(origin[0]), float(origin[1]), float(origin[2])),
+                        (float(point[0]), float(point[1]), float(point[2])),
+                    )
                 )
             print(f"recv yline: age={age:.2f}s")
             continue
@@ -138,13 +152,42 @@ def draw_axes(screen, cx, cy, yaw, pitch):
     for axis in ("x", "y", "z"):
         if axis == "x":
             x, y, z = axis_len, 0.0, 0.0
+            color = AXIS_X_COLOR
         elif axis == "y":
             x, y, z = 0.0, axis_len, 0.0
+            color = AXIS_Y_COLOR
         else:
             x, y, z = 0.0, 0.0, axis_len
+            color = AXIS_Z_COLOR
         rx, ry, rz = rotate_point(x, y, z, yaw, pitch)
         sx, sy, _ = project_point(rx, ry, rz, cx, cy)
-        pygame.draw.line(screen, AXIS_COLOR, (cx, cy), (sx, sy), 2)
+        pygame.draw.line(screen, color, (cx, cy), (sx, sy), 2)
+
+
+def draw_grid(screen, cx, cy, yaw, pitch):
+    def draw_line(p0, p1, color, width=1):
+        rx0, ry0, rz0 = rotate_point(p0[0], p0[1], p0[2], yaw, pitch)
+        rx1, ry1, rz1 = rotate_point(p1[0], p1[1], p1[2], yaw, pitch)
+        sx0, sy0, _ = project_point(rx0, ry0, rz0, cx, cy)
+        sx1, sy1, _ = project_point(rx1, ry1, rz1, cx, cy)
+        pygame.draw.line(screen, color, (sx0, sy0), (sx1, sy1), width)
+
+    steps = int((GRID_SIZE * 2) / GRID_STEP)
+    for i in range(steps + 1):
+        offset = -GRID_SIZE + i * GRID_STEP
+        is_major = abs((offset / GRID_MAJOR_STEP) - round(offset / GRID_MAJOR_STEP)) < 1e-6
+        color = GRID_MAJOR_COLOR if is_major else GRID_MINOR_COLOR
+        width = 2 if is_major else 1
+
+        # XZ plane (y=0).
+        draw_line((-GRID_SIZE, 0.0, offset), (GRID_SIZE, 0.0, offset), color, width)
+        draw_line((offset, 0.0, -GRID_SIZE), (offset, 0.0, GRID_SIZE), color, width)
+        # XY plane (z=0).
+        draw_line((-GRID_SIZE, offset, 0.0), (GRID_SIZE, offset, 0.0), color, width)
+        draw_line((offset, -GRID_SIZE, 0.0), (offset, GRID_SIZE, 0.0), color, width)
+        # YZ plane (x=0).
+        draw_line((0.0, -GRID_SIZE, offset), (0.0, GRID_SIZE, offset), color, width)
+        draw_line((0.0, offset, -GRID_SIZE), (0.0, offset, GRID_SIZE), color, width)
 
 
 def _normalize(vec):
@@ -188,6 +231,18 @@ def draw_circle(screen, center, normal, radius, yaw, pitch, cx, cy):
         points.append((sx, sy))
     if len(points) > 1:
         pygame.draw.lines(screen, (255, 160, 80), False, points, 2)
+
+def draw_line_3d(screen, p0, p1, color, yaw, pitch, cx, cy, width=2):
+    # Rotate both points
+    x0, y0, z0 = rotate_point(p0[0], p0[1], p0[2], yaw, pitch)
+    x1, y1, z1 = rotate_point(p1[0], p1[1], p1[2], yaw, pitch)
+
+    # Project to screen
+    sx0, sy0, _ = project_point(x0, y0, z0, cx, cy)
+    sx1, sy1, _ = project_point(x1, y1, z1, cx, cy)
+
+    # Draw
+    pygame.draw.line(screen, color, (sx0, sy0), (sx1, sy1), width)
 
 
 def draw_yline(screen, origin, highest, yaw, pitch, cx, cy):
@@ -233,13 +288,14 @@ def main():
 
         screen.fill(BG_COLOR)
         cx, cy = WINDOW_W // 2, WINDOW_H // 2
+        draw_grid(screen, cx, cy, yaw, pitch)
         draw_axes(screen, cx, cy, yaw, pitch)
 
         with lock:
             pts = list(positions)[-MAX_POINTS:]
             age = time.time() - latest_ts if latest_ts else 0.0
-            circle = circle_data
-            yline = yline_data
+            circles = list(circle_data)
+            ylines = list(yline_data)
             degree = degree_data
 
         if pts:
@@ -258,12 +314,10 @@ def main():
                 size = max(2, int(3 * depth))
                 pygame.draw.circle(screen, color, (sx, sy), size)
 
-        if circle is not None:
-            center, normal, radius = circle
+        for center, normal, radius in circles:
             draw_circle(screen, center, normal, radius, yaw, pitch, cx, cy)
-
-        if yline is not None:
-            origin, highest = yline
+            
+        for origin, highest in ylines:
             draw_yline(screen, origin, highest, yaw, pitch, cx, cy)
 
         label = f"points={len(pts)} age={age:.2f}s"

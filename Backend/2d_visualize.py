@@ -1,6 +1,6 @@
 import sys
 
-from utils.polar_utils import (
+from utils.math_utils import (
     load_positions, choose_random_points,
     centroid, visualize_points
 )

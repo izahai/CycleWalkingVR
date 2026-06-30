@@ -8,13 +8,13 @@ from OpenGL.GLU import *
 
 # ================= RECORDING CONFIG =================
 RECORD_DURATION_SEC = 10.0
-RECORD_OUTPUT_PATH = "sphere_positions_horizontal.json"
+RECORD_OUTPUT_PATH = "sph.json"
 
 # ================= ORBIT CONFIG =================
 # Control the motion here.
-ORBIT_ORIGIN = [1.0, 1.0, 1.0]
+ORBIT_ORIGIN = [0.5, 0.5, 0.5]
 ORBIT_NORMAL = [0.0, 1.0, 0.0]
-ORBIT_RADIUS = 0.5
+ORBIT_RADIUS = 0.1
 
 # ================= PYGAME + OPENGL =================
 pygame.init()

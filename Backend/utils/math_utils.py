@@ -203,3 +203,206 @@ def visualize_points(points, center, window_size=(640, 640)):
         clock.tick(60)
 
     pygame.quit()
+
+def line_from_point_and_vector(point, vector):
+    px, py, pz = point
+    vx, vy, vz = vector
+
+    def line(t):
+        return [
+            px + vx * t,
+            py + vy * t,
+            pz + vz * t,
+        ]
+
+    return line
+
+def closest_point_on_line(point_on_line, direction, point):
+    px, py, pz = point_on_line
+    vx, vy, vz = direction
+    qx, qy, qz = point
+
+    # Vector from line point to query point
+    wx = qx - px
+    wy = qy - py
+    wz = qz - pz
+
+    # Dot products
+    vv = vx*vx + vy*vy + vz*vz
+    if vv < 1e-12:
+        raise ValueError("Direction vector has zero length")
+
+    t = (wx*vx + wy*vy + wz*vz) / vv
+
+    return [
+        px + vx * t,
+        py + vy * t,
+        pz + vz * t,
+    ]
+    
+def distance_between_points(a, b):
+    ax, ay, az = a
+    bx, by, bz = b
+
+    dx = bx - ax
+    dy = by - ay
+    dz = bz - az
+
+    return math.sqrt(dx*dx + dy*dy + dz*dz)
+
+def y_direction(cur, last):
+    """
+    Compare Y components of two 3D points.
+
+    Returns:
+        1  -> y increased
+        -1 -> y decreased
+        0  -> no change
+    """
+    if cur[1] > last[1]:
+        return 1
+    elif cur[1] < last[1]:
+        return -1
+    else:
+        return 0
+
+def circle_points_at_distance(
+    circle_center,
+    circle_normal,
+    circle_radius,
+    point,
+    d,
+    offset=0.1,
+    eps=1e-9,
+):
+    C = np.asarray(circle_center, float)
+    n = np.asarray(circle_normal, float)
+    P = np.asarray(point, float)
+
+    n_norm = np.linalg.norm(n)
+    if n_norm < eps:
+        raise ValueError("Circle normal has zero length")
+    n = n / n_norm
+
+    # Effective distance with tolerance
+    d_min = max(d - offset, 0.0)
+    d_max = d + offset
+
+    # Distance from point to circle plane
+    h = abs(np.dot(P - C, n))
+
+    # Sphere shell does not reach plane
+    if h > d_max + eps:
+        return []
+
+    # Projection of P onto circle plane
+    P_proj = P - np.dot(P - C, n) * n
+
+    # Radius range of intersection circle (sphere ∩ plane)
+    rho_min = math.sqrt(max(d_min * d_min - h * h, 0.0))
+    rho_max = math.sqrt(max(d_max * d_max - h * h, 0.0))
+
+    v = P_proj - C
+    D = np.linalg.norm(v)
+
+    # No intersection even with tolerance
+    if D > circle_radius + rho_max + eps:
+        return []
+    if D < abs(circle_radius - rho_max) - eps:
+        return []
+
+    # Use midpoint radius for point construction
+    rho = 0.5 * (rho_min + rho_max)
+
+    # Tangent (one solution)
+    if abs(D - (circle_radius + rho)) < eps or abs(D - abs(circle_radius - rho)) < eps:
+        if D < eps:
+            return []
+        dir_vec = v / D
+        return [(C + circle_radius * dir_vec).tolist()]
+
+    # Two intersection points
+    u = v / D
+    w = np.cross(n, u)
+
+    a = (circle_radius**2 - rho**2 + D**2) / (2 * D)
+    h2 = circle_radius**2 - a**2
+    h2 = max(h2, 0.0)
+    b = math.sqrt(h2)
+
+    p0 = C + a * u
+    p1 = p0 + b * w
+    p2 = p0 - b * w
+
+    return [p1.tolist(), p2.tolist()]
+
+
+def project_point_to_circle_rim(center, normal, radius, point, eps=1e-12):
+    """
+    Project a 3D point onto the closest point on a circle rim.
+
+    Args:
+        center: [x, y, z] circle center
+        normal: [nx, ny, nz] circle normal
+        radius: circle radius
+        point:  [x, y, z] point to project
+
+    Returns:
+        [x, y, z] point on the circle rim
+    """
+    cx, cy, cz = center
+    nx, ny, nz = normal
+    px, py, pz = point
+
+    # Normalize normal
+    n_len = math.sqrt(nx*nx + ny*ny + nz*nz)
+    if n_len < eps:
+        raise ValueError("Normal vector has zero length")
+    nx /= n_len
+    ny /= n_len
+    nz /= n_len
+
+    # Vector from center to point
+    vx = px - cx
+    vy = py - cy
+    vz = pz - cz
+
+    # Remove normal component (project onto plane)
+    d = vx*nx + vy*ny + vz*nz
+    pxp = px - d*nx
+    pyp = py - d*ny
+    pzp = pz - d*nz
+
+    # Direction from center in plane
+    dx = pxp - cx
+    dy = pyp - cy
+    dz = pzp - cz
+
+    length = math.sqrt(dx*dx + dy*dy + dz*dz)
+    if length < eps:
+        raise ValueError("Point projects to circle center; direction undefined")
+
+    # Scale to circle radius
+    scale = radius / length
+
+    return [
+        cx + dx * scale,
+        cy + dy * scale,
+        cz + dz * scale,
+    ]
+    
+def angle_deg_from_ref(origin, ref_point, point):
+    # Reference vector (origin -> ref_point)
+    v0y = ref_point[1] - origin[1]
+    v0z = ref_point[2] - origin[2]
+
+    # Target vector (origin -> point)
+    v1y = point[1] - origin[1]
+    v1z = point[2] - origin[2]
+
+    # Angles in plane
+    a0 = math.atan2(v0z, v0y)
+    a1 = math.atan2(v1z, v1y)
+
+    # Difference, wrapped to [0, 360)
+    return (math.degrees(a1 - a0)) % 360.0
