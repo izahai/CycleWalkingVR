@@ -1,3 +1,16 @@
+Your current script is a solid foundation—it moves the avatar to the correct 2D plane and accurately handles the movement blend based on headset velocity.
+
+To bridge the gap between this script and precise stair climbing, **your immediate next MVP milestone is to replace that hardcoded `floorHeight = 0f` with dynamic raycasting.** Before you even touch IK rigging, your code must dynamically discover where the stairs are. Here is exactly what to modify in Unity next.
+
+---
+
+## Step 1: Upgrading the Code to "See" the Stairs
+
+Instead of clamping the avatar to a flat `floorHeight`, we will shoot a raycast downward from the headset's position to find the current step's height, and a raycast slightly forward to predict the next step's height.
+
+Replace your current script with this updated MVP version:
+
+```csharp
 using UnityEngine;
 
 [RequireComponent(typeof(Animator))]
@@ -89,3 +102,25 @@ public class AvatarFollow : MonoBehaviour
         Debug.DrawRay(downRayOrigin, Vector3.down * 3f, Color.green);
     }
 }
+
+```
+
+---
+
+## Step 2: What to setup in Unity Editor right now
+
+1. **Assign a Layer:** Select all of your 3D stair assets in the inspector. Change their **Layer** to a new layer named `Ground` or `Stairs`.
+2. **Update the Component:** On your avatar's `AvatarFollow` component, set the **Ground Layer** dropdown mask to match that `Ground/Stairs` layer you just made.
+3. **Press Play and Watch:** Walk up your stairs in VR or move the headset object manually in the scene view.
+* Look at the Scene tab. You will see green and red debug lines tracking the floor.
+* The avatar's whole body should now automatically smoothly glide upward onto the steps because `targetPelvisHeight` updates dynamically.
+
+
+
+---
+
+## What this achieves for your MVP
+
+By finishing this step, you have solved **Phase 2 (Procedural Detection)** and the pelvis movement portion of **Phase 3**. Your avatar no longer clips through the stairs horizontally; instead, the whole body smoothly ascends the incline.
+
+Because the pelvis now lifts naturally to the correct $Y$ height, your next step will simply be installing Unity's **Animation Rigging** package to snap the feet down to those exact green/red raycast hit positions so they don't slide.
