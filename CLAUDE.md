@@ -74,10 +74,18 @@ The repository is divided into two primary subsystems: a Python **Backend** (act
 * **`AvatarFollow.cs`**:
   * Performs raycasting from the VR headset to detect step/terrain heights dynamically, updating target pelvis heights for procedural walking animations.
   * The primary script for IK-driven character follow (used in `IK_Scene`).
+  * Has optional `pedalSource` (BikeLocomotion) + `followPedalXZ`: when set, animator speed comes from pedal cadence and body XZ stays with the CharacterController instead of the headset. Required for simulated pedal testing.
+* **`AnglePacket.cs`**: UDP packet data struct with `angle_deg` and `ts` fields.
+* **`FootRaycastResult.cs`** (M4): Shared data struct — `hit`, `point`, `normal`, `distance`, `hitTransform`. Produced by FootRaycaster, consumed by FootIKDriver. No IK awareness.
+* **`FootRaycaster.cs`** (M4): Per-foot raycasting data provider. Casts rays from each foot bone straight down each frame, plus a forward-probe for stair detection. Pure data — no Animation Rigging. Exposes `.leftFoot`, `.rightFoot`, `.forwardProbe` (read-only).
+* **`FootIKDriver.cs`** (M4): IK actuator. Reads FootRaycaster data, detects swing/stance via foot Y-velocity, blends per-foot IK weights independently, moves LeftTarget/RightTarget to raycast hits. Designed to accept StepStateMachine in M5 without modification.
 
 ### Focus: Only IK_Scene matters
 * **`Client/CycleWalking/Assets/Scenes/IK_Scene.unity`** is the only active scene for development.
-* Scene setup: `AppCode` GameObject with `BikeLocomotion` + `UdpReceiver` + `AvatarFollow` scripts, plus `XR Origin (XR Rig)` and `Y Bot` character with Animation Rigging IK.
+* Scene hierarchy:
+  * `AppCode` — `BikeLocomotion` + `UdpReceiver`
+  * `Y Bot IK` — `AvatarFollow` + `FootRaycaster` + `FootIKDriver` + `Animator` + `RigBuilder`, plus `XR Origin (XR Rig)` child
+  * `LongStair` — test staircase (Layer 6 / Ground)
 * **`PolarCycle.cs` (UdpCyclingLocomotion)** is associated with `BasicScene.unity` — ignore this file unless explicitly referenced.
 
 ---

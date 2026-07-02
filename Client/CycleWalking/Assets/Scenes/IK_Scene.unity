@@ -132,7 +132,7 @@ GameObject:
   - component: {fileID: 17643037}
   - component: {fileID: 17643036}
   - component: {fileID: 17643035}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Plane
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -549,7 +549,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1717954561962503726, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 7.21
+      value: 7.695
       objectReference: {fileID: 0}
     - target: {fileID: 1717954561962503726, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1347,7 +1347,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1089663640}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Environment
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1673,12 +1673,16 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1800742008880995996, guid: 75e962e475df34238a9c62db8c6be757, type: 3}
       propertyPath: m_Enabled
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1800742008880995996, guid: 75e962e475df34238a9c62db8c6be757, type: 3}
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 03f620e40bce74bc3a8366e9d35c41c8, type: 2}
+    - target: {fileID: 1800742008880995996, guid: 75e962e475df34238a9c62db8c6be757, type: 3}
+      propertyPath: m_AnimatePhysics
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1800742008880995996, guid: 75e962e475df34238a9c62db8c6be757, type: 3}
       propertyPath: m_ApplyRootMotion
       value: 0
@@ -1966,6 +1970,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3108240595909218108, guid: 75e962e475df34238a9c62db8c6be757, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2142386794472425349}
+    - targetCorrespondingSourceObject: {fileID: 3108240595909218108, guid: 75e962e475df34238a9c62db8c6be757, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2142386794472425355}
+    - targetCorrespondingSourceObject: {fileID: 3108240595909218108, guid: 75e962e475df34238a9c62db8c6be757, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2142386794472425354}
   m_SourcePrefab: {fileID: 100100000, guid: 75e962e475df34238a9c62db8c6be757, type: 3}
 --- !u!114 &2142386794472425349
 MonoBehaviour:
@@ -1990,6 +2000,54 @@ MonoBehaviour:
   animationDamping: 0.1
   idleAnimatorSpeed: 1
   walkAnimatorSpeed: 2
+  pedalSource: {fileID: 1626580280}
+  followPedalXZ: 1
+--- !u!114 &2142386794472425354
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1540487278}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ab103dd1ec3a4dd2ab5d2c13c32cc0c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootIKDriver
+  footRaycaster: {fileID: 2142386794472425355}
+  leftTarget: {fileID: 0}
+  rightTarget: {fileID: 0}
+  leftHint: {fileID: 0}
+  rightHint: {fileID: 0}
+  snapSpeed: 15
+  weightBlendSpeed: 8
+  swingVelocityThreshold: 0.25
+  showWeights: 1
+  liftKey: 32
+  liftDuration: 0.5
+  liftHeightOffset: 0.15
+  testRightFoot: 1
+--- !u!114 &2142386794472425355
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1540487278}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2bccf91b042c3418eb6a4fae42418bd8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootRaycaster
+  leftFootBone: {fileID: 0}
+  rightFootBone: {fileID: 0}
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  footRayLength: 2
+  forwardProbeDistance: 0.35
+  forwardProbeLength: 3
+  showDebugRays: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
